@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星际躲避战</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 20% 20%, #263c73 0, transparent 30%),
+        radial-gradient(circle at 80% 70%, #4b185f 0, transparent 30%),
+        #070b1c;
+    color: white;
+    font-family: Arial, "Microsoft YaHei", sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.game-wrapper {
+    width: min(95vw, 850px);
+    text-align: center;
+}
+
+h1 {
+    font-size: 42px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px #6c8cff;
+}
+
+.subtitle {
+    color: #9ca9d8;
+    margin-bottom: 20px;
+}
+
+.info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding: 0 10px;
+    font-size: 18px;
+}
+
+.info span {
+    color: #65e7ff;
+    font-weight: bold;
+}
+
+#game {
+    position: relative;
+    width: 100%;
+    height: 520px;
+    border: 2px solid #34467e;
+    border-radius: 18px;
+    overflow: hidden;
+    background:
+        radial-gradient(circle, #ffffff 1px, transparent 1px);
+    background-size: 55px 55px;
+    background-color: #090e24;
+    box-shadow:
+        0 0 30px rgba(75, 125, 255, .25),
+        inset 0 0 80px rgba(0, 0, 0, .6);
+}
+
+.player {
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, #64f2ff, #3478ff);
+    border-radius: 10px;
+    box-shadow:
+        0 0 12px #49dfff,
+        0 0 30px rgba(73, 223, 255, .6);
+}
+
+.enemy {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #ff405f, #ff7b35);
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(255, 65, 80, .8);
+}
+
+.coin {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #ffd84d;
+    border: 3px solid #fff0a1;
+    box-shadow: 0 0 15px #ffd84d;
+}
+
+#startScreen,
+#gameOver {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 8, 25, .82);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    backdrop-filter: blur(5px);
+}
+
+#gameOver {
+    display: none;
+}
+
+#startScreen h2,
+#gameOver h2 {
+    font-size: 38px;
+    margin-bottom: 15px;
+}
+
+#gameOver h2 {
+    color: #ff637c;
+}
+
+button {
+    border: none;
+    padding: 14px 32px;
+    margin-top: 20px;
+    border-radius: 30px;
+    background: linear-gradient(135deg, #5578ff, #9b59ff);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(90, 100, 255, .35);
+    transition: .2s;
+}
+
+button:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 12px 35px rgba(90, 100, 255, .55);
+}
+
+.controls {
+    margin-top: 14px;
+    color: #8792bb;
+    font-size: 14px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="game-wrapper">
+
+    <h1>🚀 星际躲避战</h1>
+    <div class="subtitle">躲避敌人 · 收集能量 · 挑战最高分</div>
+
+    <div class="info">
+        <div>分数：<span id="score">0</span></div>
+        <div>生命：<span id="lives">❤️❤️❤️</span></div>
+        <div>等级：<span id="level">1</span></div>
+    </div>
+
+    <div id="game">
+
+        <div id="player" class="player"></div>
+
+        <div id="startScreen">
+            <h2>🚀 准备起飞</h2>
+            <p>使用 WASD 或方向键控制飞船</p>
+            <button onclick="startGame()">开始游戏</button>
+        </div>
+
+        <div id="gameOver">
+            <h2>游戏结束</h2>
+            <p>最终得分：<strong id="finalScore">0</strong></p>
+            <button onclick="startGame()">再来一次</button>
+        </div>
+
+    </div>
+
+    <div class="controls">
+        ↑ ↓ ← → 或 W A S D 移动　|　收集黄色能量球
+    </div>
+
+</div>
+
+<script>
+const game = document.getElementById("game");
+const player = document.getElementById("player");
+
+const scoreEl = document.getElementById("score");
+const livesEl = document.getElementById("lives");
+const levelEl = document.getElementById("level");
+
+const startScreen = document.getElementById("startScreen");
+const gameOverScreen = document.getElementById("gameOver");
+const finalScore = document.getElementById("finalScore");
+
+let gameRunning = false;
+
+let score = 0;
+let lives = 3;
+let level = 1;
+
+let playerX = 100;
+let playerY = 240;
+
+let keys = {};
+let enemies = [];
+let coins = [];
+
+let enemyTimer;
+let coinTimer;
+let animationId;
+
+document.addEventListener("keydown", e => {
+    keys[e.key.toLowerCase()] = true;
+
+    if (
+        ["arrowup", "arrowdown", "arrowleft", "arrowright", " "]
+        .includes(e.key.toLowerCase())
+    ) {
+        e.preventDefault();
+    }
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.key.toLowerCase()] = false;
+});
+
+function startGame() {
+
+    clearGame();
+
+    score = 0;
+    lives = 3;
+    level = 1;
+
+    playerX = 100;
+    playerY = game.clientHeight / 2;
+
+    updateUI();
+
+    startScreen.style.display = "none";
+    gameOverScreen.style.display = "none";
+
+    gameRunning = true;
+
+    spawnEnemy();
+    spawnCoin();
+
+    enemyTimer = setInterval(() => {
+        if (gameRunning) spawnEnemy();
+    }, 900);
+
+    coinTimer = setInterval(() => {
+        if (gameRunning) spawnCoin();
+    }, 1400);
+
+    gameLoop();
+}
+
+function clearGame() {
+
+    enemies.forEach(e => e.el.remove());
+    coins.forEach(c => c.el.remove());
+
+    enemies = [];
+    coins = [];
+
+    clearInterval(enemyTimer);
+    clearInterval(coinTimer);
+
+    cancelAnimationFrame(animationId);
+}
+
+function gameLoop() {
+
+    if (!gameRunning) return;
+
+    movePlayer();
+    moveEnemies();
+    checkCoins();
+
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+function movePlayer() {
+
+    const speed = 6;
+
+    if (keys["arrowup"] || keys["w"])
+        playerY -= speed;
+
+    if (keys["arrowdown"] || keys["s"])
+        playerY += speed;
+
+    if (keys["arrowleft"] || keys["a"])
+        playerX -= speed;
+
+    if (keys["arrowright"] || keys["d"])
+        playerX += speed;
+
+    const maxX = game.clientWidth - player.offsetWidth;
+    const maxY = game.clientHeight - player.offsetHeight;
+
+    playerX = Math.max(0, Math.min(maxX, playerX));
+    playerY = Math.max(0, Math.min(maxY, playerY));
+
+    player.style.left = playerX + "px";
+    player.style.top = playerY + "px";
+}
+
+function spawnEnemy() {
+
+    const el = document.createElement("div");
+    el.className = "enemy";
+
+    const y = Math.random() *
+        (game.clientHeight - 35);
+
+    el.style.left = game.clientWidth + "px";
+    el.style.top = y + "px";
+
+    game.appendChild(el);
+
+    enemies.push({
+        el,
+        x: game.clientWidth,
+        y,
+        speed: 3 + level * 0.45 + Math.random() * 2
+    });
+}
+
+function moveEnemies() {
+
+    for (let i = enemies.length - 1; i >= 0; i--) {
+
+        const enemy = enemies[i];
+
+        enemy.x -= enemy.speed;
+        enemy.el.style.left = enemy.x + "px";
+
+        if (collision(player, enemy.el)) {
+
+            enemy.el.remove();
+            enemies.splice(i, 1);
+
+            lives--;
+
+            updateUI();
+
+            if (lives <= 0) {
+                endGame();
+                return;
+            }
+        }
+
+        if (enemy.x < -50) {
+            enemy.el.remove();
+            enemies.splice(i, 1);
+
+            score += 1;
+
+            if (score % 10 === 0) {
+                level++;
+            }
+
+            updateUI();
+        }
+    }
+}
+
+function spawnCoin() {
+
+    const el = document.createElement("div");
+    el.className = "coin";
+
+    const x = Math.random() *
+        (game.clientWidth - 30);
+
+    const y = Math.random() *
+        (game.clientHeight - 30);
+
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+
+    game.appendChild(el);
+
+    coins.push({
+        el,
+        x,
+        y
+    });
+}
+
+function checkCoins() {
+
+    for (let i = coins.length - 1; i >= 0; i--) {
+
+        const coin = coins[i];
+
+        if (collision(player, coin.el)) {
+
+            coin.el.remove();
+            coins.splice(i, 1);
+
+            score += 10;
+
+            if (score % 30 === 0) {
+                level++;
+            }
+
+            updateUI();
+        }
+    }
+}
+
+function collision(a, b) {
+
+    const r1 = a.getBoundingClientRect();
+    const r2 = b.getBoundingClientRect();
+
+    return !(
+        r1.right < r2.left ||
+        r1.left > r2.right ||
+        r1.bottom < r2.top ||
+        r1.top > r2.bottom
+    );
+}
+
+function updateUI() {
+
+    scoreEl.textContent = score;
+    levelEl.textContent = level;
+
+    livesEl.textContent =
+        "❤️".repeat(lives) +
+        "🖤".repeat(3 - lives);
+}
+
+function endGame() {
+
+    gameRunning = false;
+
+    clearInterval(enemyTimer);
+    clearInterval(coinTimer);
+
+    cancelAnimationFrame(animationId);
+
+    finalScore.textContent = score;
+    gameOverScreen.style.display = "flex";
+}
+
+</script>
+
+</body>
+</html>
